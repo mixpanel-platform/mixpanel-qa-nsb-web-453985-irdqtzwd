@@ -2,14 +2,303 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <!-- Mixpanel Platform -->
+    <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
+
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/css/reset.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
-    <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
+    <!-- Font Awesome  -->
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+
+    <!-- Utilities Platform -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/0.71/jquery.csv-0.71.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+  <!-- Latest compiled and minified CSS -->
+   
+
   </head>
-  <body class="mixpanel-platform-body">
-    <h1>Hello, World!</h1>
-    <script>
-      // Run queries and display results here
+
+  <body class="mixpanel-platform-body spec">
+    <script id="jql-spec" type="text/javscript">
+
+      var default_props = {
+        "$city":1,
+        "$region":1,
+        "mp_country_code":1,
+        "$brand":1,
+        "$bluetooth_version":1,
+        "$device":1,
+        "$os":1,
+        "$app_release":1,
+        "$app_version":1,
+        "$carrier":1,
+        "$lib_version":1,
+        "$wifi":1,
+        "$screen_width":1,
+        "$screen_height":1,
+        "$model":1,
+        "$os_version":1,
+        "$manufacturer":1,
+        "$screen_dpi":1,
+        "$has_telephone":1,
+        "has_nfc":1,
+        "$bluetooth_enabled":1,
+        "$browser":1,
+        "$initial_referrer":1,
+        "$initial_referring_domain":1,
+        "$referrer":1,
+        "$referring_domain":1,
+        "$browser_version":1,
+        "mp_keyword":1,
+        "$search_engine":1,
+        "utm_source":1,
+        "utm_medium":1,
+        "utm_campaign":1,
+        "utm_content":1,
+        "utm_term":1,
+        "$radio":1,
+        "mp_device_model":1,
+        "$google_play_services":1,
+        "mp_lib":1,
+        "campaign_id":1,
+        "message_id":1,
+        "message_subtype":1,
+        "message_type":1,
+        "$answer_count":1,
+        "survey_id":1,
+        "collection_id":1,
+        "$survey_shown":1,
+        "$watch_model":1,
+        "$ios_ifa":1,
+        "$current_url":1,
+        "$duration":1,
+        "$from_binding":1,
+        "$experiments":1,
+        "$import":1,
+        "distinct_id":1,
+        "time":1,
+        "$has_nfc":1
+      };
+
+
+      var default_events = {
+        "$campaign_delivery":1,
+        "$campaign_marked_spam":1,
+        "$campaign_bounced":1,
+        "$campaign_open":1,
+        "$experiment_started":1,
+        "$show_survey":1
+      };
+      
+      var from_date = new Date(_.now() - (params.days * 24 * 60 * 60 * 1000)).toISOString().slice(0, -14);
+      function main() {
+        return Events({
+          from_date: from_date,
+          to_date: new Date().toISOString().slice(0, -14)  
+        })
+        //.filter(event => event.properties.mp_lib == params.library)
+        .filter(event => !default_events[event.name])
+        .groupBy(['name'], function(accums, events){
+          var res = {};
+          _.each(events, function(event) {
+            res[event.name] = res[event.name] || {};
+            _.each(event.properties, function(propVal, propName) {
+              if (!default_props[propName]) {
+                res[event.name][propName] = res[event.name][propName] || [];
+                res[event.name][propName] = _.union(res[event.name][propName], [typeof(propVal)]);
+              }
+            });
+          });
+          _.each(accums, function(accum) {
+            _.each(accum, function(propList, eventName) {
+              res[eventName] = res[eventName] || {};
+              _.each(propList, function(propTypes, propName) {
+                res[eventName][propName] = res[eventName][propName] || {};
+                res[eventName][propName] = _.union(res[eventName][propName], propTypes);
+              });
+            });
+          });
+          return res;
+        })
+        .map(item => item.value);
+      }
     </script>
+    
+    <input id="file-input" type="file" />
+    <script type="text/javascript">
+      csvImport = function(file){
+        var header,
+            csvArray;
+        var eventIndex = -1;
+        var events = {};
+        var superProps = {};
+        var data = $.csv.toArrays(file);
+        header = data[0];
+        var lastEvent = ''
+        if (data && data.length > 0) {
+          csvArray = data.slice(1, data.length);
+          _.each(csvArray, function(arr){
+            var feature = arr[header.indexOf('Feature')];
+            var product = arr[header.indexOf('Product')]
+            var property = arr[header.indexOf('Property')];
+            var eventName = arr[header.indexOf('Event Name')];
+            var superProperty = arr[header.indexOf('Super Property')];
+            var propertyType = arr[header.indexOf('Property Type')];
+            var superPropType = arr[header.indexOf('Super Property Type')];
+            var comments = arr[header.indexOf('Comments')];
+            var changes = arr[header.indexOf('Changes?')]
+            var ios = arr[header.indexOf('iOS')];
+            var android = arr[header.indexOf('Android')];
+            var web = arr[header.indexOf('Web')];
+            
+            if (eventName){
+              lastEvent = eventName
+              events[lastEvent] = {
+                feature: feature,
+                product: product,
+                state: { ios: false, android: false, web: false},
+                properties: {},
+                libraries: { ios: ios, web: web, android: android },
+                comments: comments,
+                changes: changes
+              }
+            }
+            if (property) {
+              events[lastEvent]['properties'][property] = {
+                type: propertyType,
+                libraries: { ios: ios, web: web, android: android },
+                state: { ios: false, android: false, web: false},
+                comments: comments,
+                changes: changes
+              }
+            }
+            if (superProperty) {
+              superProps[superProperty] = {
+                type: superPropType,
+                libraries: { ios: ios, web: web, android: android },
+                state: { ios: false, android: false, web: false},
+              }
+            }
+          });
+          return {events: events, superProps: superProps};
+        } else {
+          /* alert('No data to import!'); */
+        }
+      }
+      
+      /* Csv Export
+      ** Write the values out
+      **
+      */
+      function csvExport(spec){
+        csvArray = ["Product,Feature,Event,Properties,Super Properties,Android,iOS,Web,Comments,Changes"]
+        _.each(spec.events, function(val, event){
+          var prod = val.product
+          var feat = val.feature
+          var lib = val.libraries
+          var state = val.state
+          var comments = val.comments
+          var changes = val.changes
+          csvArray.push(prod + ',' + feat + ',' + event + ',,,' + String(lib.android == String(state.android).toUpperCase()) + ',' + String(lib.ios == String(state.ios).toUpperCase()) + ',' + String(lib.web == String(state.web).toUpperCase()) + ',' + comments + ',' + changes)
+          _.each(val.properties, function(pV, prop){
+            var pLib = pV.libraries
+            var pState = pV.state
+            var pComments = pV.comments
+            var pChanges = pV.changes
+            debugger
+            csvArray.push(prod + ',' + feat + ',,' + prop + ',,' + String(pLib.android == String(pState.android).toUpperCase())  + ',' + String(pLib.ios == String(pState.ios).toUpperCase()) + ',' + String(pLib.web == String(pState.web).toUpperCase()) + ',' + pComments + ',' + pChanges)
+          })
+        })
+      var CSV = csvArray.join('\n')
+      var uri = 'data:text/csv;charset=utf-8,' + escape(CSV);
+  
+      // Now the little tricky part.
+      // you can use either>> window.open(uri);
+      // but this will not work in some browsers
+      // or you will not get the correct file extension    
+  
+      //this trick will generate a temp <a /> tag
+      var link = document.createElement("a");    
+      link.href = uri;
+  
+      //set the visibility hidden so it will not effect on your web-layout
+      link.style = "visibility:hidden";
+      link.download = "audit.csv";
+  
+      //this part will append the anchor tag and remove it after automatic click
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      }
+      
+      /* Import File
+      ** Takes an event
+      ** Returns promise
+      */
+      function readSingleFile(e) {
+        var file = e.target.files[0];
+        if (!file) {
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var contents = e.target.result;
+          var spec = csvImport(contents)
+          checker(spec)
+        };
+        reader.readAsText(file);
+      }
+  
+      checker = function(spec) {
+        var params = {
+          days: 30,
+          library: 'iPhone'
+        }
+        
+        var iOS = MP.api.jql($('#jql-spec').html(), {days: 30, library: 'iPhone'})
+        var web = MP.api.jql($('#jql-spec').html(), {days: 30, library: 'web'})
+        var android = MP.api.jql($('#jql-spec').html(), {days: 30, library: 'android'})
+        
+        // make jql query
+        // check for state, 
+        // how to do Super Properties?
+       $.when(iOS, web, android).done(function(iOSAudit, webAudit, androidAudit){
+          var ios = auditLib(iOSAudit, 'ios', spec)
+          var web = auditLib(webAudit, 'web', spec)
+          var android = auditLib(androidAudit, 'android', spec)
+          csvExport(spec)
+        })
+        
+      };
+      
+      var auditLib = function(implementation, libstring, spec) {
+        audit = {}
+        var events = spec.events
+        _.each(implementation, function(eventObj, idx) {
+          _.each(eventObj, function(properties, eventName){
+            audit[eventName] = properties
+          })
+        })
+        _.each(events, function(properties, eventName) {
+          console.log(eventName)
+          if (audit[eventName] != undefined) {
+            events[eventName]['state'][libstring] = true
+            _.each(properties, function(types, prop){
+              if (audit[eventName][prop] != undefined){
+                
+                events[event]['properties'][prop]['state'][libstring] = true
+                // del audit[event][prop]
+              }
+              // super props?
+            })
+          }
+        })
+        return audit
+      }
+      document.getElementById('file-input')
+        .addEventListener('change', readSingleFile, false);
+      </script>
   </body>
 </html>
