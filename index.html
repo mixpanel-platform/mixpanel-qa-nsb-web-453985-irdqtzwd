@@ -287,7 +287,7 @@
             events[eventName]['state'][libstring] = true
             _.each(properties, function(types, prop){
               if (audit[eventName][prop] != undefined){
-                
+                debugger
                 events[event]['properties'][prop]['state'][libstring] = true
                 // del audit[event][prop]
               }
